@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.5.51", features = ["derive"] }
+indicatif = "0.18.2"
 notify-rust = { version = "4.11.7", features = ["image"] }
