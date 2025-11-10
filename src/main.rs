@@ -1,7 +1,8 @@
+mod timer;
 use std::{process::exit, thread, time};
 
 use clap::Parser;
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use notify_rust::Notification;
 
 #[derive(Parser, Debug)]
@@ -44,6 +45,10 @@ fn main() {
         exit(1);
     }
 
+    let sty = ProgressStyle::with_template("{wide_bar} {msg}")
+        .unwrap()
+        .progress_chars("#*-");
+
     let timer_seconds =
         args.seconds.unwrap_or(0) + 60 * args.minutes.unwrap_or(0) + 3600 * args.hours.unwrap_or(0);
     let duration = time::Duration::from_secs(timer_seconds);
@@ -51,21 +56,22 @@ fn main() {
     let steps = 1000;
     let step_duration = duration / steps;
 
-    let bar = ProgressBar::new(steps.into());
-    for _ in 0..steps {
+    let bar = ProgressBar::new(steps.into()).with_style(sty);
+    for i in 0..steps {
+        bar.set_message(format!("[we be on {i}!]"));
         bar.inc(1);
         thread::sleep(step_duration);
     }
     bar.finish();
 
-    let title = args.notif.unwrap_or("Timer".to_string());
     // NOTE: how do we bundle this file with the actual application?
     let icon_path = "/home/leaves/Code/rtimer/resources/ktimer.svg";
+    let body = args.notif.unwrap_or("time's up!".to_string());
     let _ = Notification::new()
-        .summary(&title)
-        // .body("notification notification notification!!!")
+        .summary("rtimer")
+        .body(&body)
         .icon(icon_path)
         .show();
 
-    // parent process needs some way to maintain handles to
+    // parent process needs some way to maintain handles to spawned children
 }
