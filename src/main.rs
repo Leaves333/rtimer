@@ -1,5 +1,9 @@
 mod timer;
-use std::{process::exit, thread, time};
+use std::{
+    process::exit,
+    thread,
+    time::{self, Duration, Instant},
+};
 
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -32,12 +36,41 @@ struct Args {
     notif: Option<String>,
 }
 
-fn main() {
-    // like what do we actually need to do?
-    // would like to spawn a subprocess that
-    // sleeps for the appropriate time
-    // then sends a notification
+struct Time {
+    secs: u64,
+    mins: u64,
+    hours: u64,
+}
 
+impl Time {
+    fn from(duration: Duration) -> Self {
+        Self {
+            secs: duration.as_secs() % 60,
+            mins: (duration.as_secs() / 60) % 60,
+            hours: duration.as_secs() / 3600,
+        }
+    }
+}
+
+fn format_durations(elapsed: Duration, total: Duration) -> String {
+    let elapsed = Time::from(elapsed);
+    let total = Time::from(total);
+
+    if elapsed.hours != 0 || total.hours != 0 {
+        let elapsed_str = format!(
+            "{:0>2}:{:0>2}:{:0>2}",
+            elapsed.hours, elapsed.mins, elapsed.secs
+        );
+        let total_str = format!("{:0>2}:{:0>2}:{:0>2}", total.hours, total.mins, total.secs);
+        return format!("{}/{}", elapsed_str, total_str);
+    } else {
+        let elapsed_str = format!("{:0>2}:{:0>2}", elapsed.mins, elapsed.secs);
+        let total_str = format!("{:0>2}:{:0>2}", total.mins, total.secs);
+        return format!("{}/{}", elapsed_str, total_str);
+    }
+}
+
+fn main() {
     let args = Args::parse();
     if args.seconds.is_none() && args.minutes.is_none() && args.seconds.is_none() {
         println!("error: must specify a timer duration!");
@@ -45,20 +78,27 @@ fn main() {
         exit(1);
     }
 
-    let sty = ProgressStyle::with_template("{wide_bar} {msg}")
+    let sty = ProgressStyle::with_template("{msg} [{wide_bar}] ")
         .unwrap()
-        .progress_chars("#*-");
+        .progress_chars("=-_");
 
     let timer_seconds =
         args.seconds.unwrap_or(0) + 60 * args.minutes.unwrap_or(0) + 3600 * args.hours.unwrap_or(0);
-    let duration = time::Duration::from_secs(timer_seconds);
+    let total_duration = time::Duration::from_secs(timer_seconds);
 
-    let steps = 1000;
-    let step_duration = duration / steps;
+    let start_time = Instant::now();
+
+    let steps = 1000.max(timer_seconds);
+    let step_duration = total_duration / steps as u32;
 
     let bar = ProgressBar::new(steps.into()).with_style(sty);
-    for i in 0..steps {
-        bar.set_message(format!("[we be on {i}!]"));
+    for _ in 0..steps {
+        let cur_time = Instant::now();
+        let message = format!(
+            "[{}]",
+            format_durations(cur_time - start_time, total_duration)
+        );
+        bar.set_message(message);
         bar.inc(1);
         thread::sleep(step_duration);
     }
@@ -72,6 +112,4 @@ fn main() {
         .body(&body)
         .icon(icon_path)
         .show();
-
-    // parent process needs some way to maintain handles to spawned children
 }
